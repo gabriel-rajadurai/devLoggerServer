@@ -1,19 +1,17 @@
 package com.example.demo.controller
 
+import com.example.demo.app.LogLevel
 import com.example.demo.db.LogMessage
 import com.example.demo.db.LogTable
 import com.example.demo.viewModel.LogViewModel
 import com.google.gson.JsonObject
 import javafx.application.Platform
-import javafx.beans.property.Property
 import javafx.collections.ObservableList
-import javafx.collections.ObservableSet
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.TransactionManager
 import org.jetbrains.exposed.sql.transactions.transaction
 import tornadofx.Controller
 import tornadofx.asObservable
-import tornadofx.observableListOf
 import java.sql.Connection
 
 class DbController : Controller() {
@@ -88,20 +86,53 @@ class DbController : Controller() {
         }
     }
 
-    fun filterByUser(userId: String?) {
-        userId?.let {
-            transaction {
-                logs.clear()
-                logs.addAll(
+    private fun filterOnlyByUser(userId: String?) {
+        transaction {
+            logs.clear()
+            logs.addAll(
+                    if (userId == null) {
+                        LogMessage.all()
+                    } else {
                         LogMessage.find {
                             LogTable.userId eq userId
-                        }.map {
-                            LogViewModel().apply {
-                                item = it
+                        }
+                    }.map {
+                        LogViewModel().apply {
+                            item = it
+                        }
+                    }
+            )
+        }
+    }
+
+    fun filterLogs(userId: String?, logLevel: LogLevel?, searchText: String?) {
+        transaction {
+            logs.clear()
+            logs.addAll(
+                    when {
+                        userId == null && logLevel == null && searchText.isNullOrBlank() -> {
+                            LogMessage.all()
+                        }
+                        else -> {
+                            LogMessage.find {
+                                when {
+                                    userId == null && logLevel == null && !searchText.isNullOrBlank() -> LogTable.tag like "%$searchText%"
+                                    userId == null && logLevel != null && searchText.isNullOrBlank() -> LogTable.logLevel eq logLevel.level
+                                    userId != null && logLevel == null && searchText.isNullOrBlank() -> LogTable.userId eq userId
+                                    userId != null && logLevel == null && !searchText.isNullOrBlank() -> (LogTable.userId eq userId) and (LogTable.tag like "%$searchText%")
+                                    userId != null && logLevel != null && searchText.isNullOrBlank() -> (LogTable.userId eq userId) and (LogTable.logLevel eq logLevel.level)
+                                    userId == null && logLevel != null && !searchText.isNullOrBlank() -> (LogTable.logLevel eq logLevel.level) and (LogTable.tag like "%$searchText%")
+                                    else -> (LogTable.logLevel eq logLevel!!.level) and
+                                            (LogTable.userId eq userId!!) and (LogTable.tag like "%$searchText%")
+                                }
                             }
                         }
-                )
-            }
+                    }.map {
+                        LogViewModel().apply {
+                            item = it
+                        }
+                    }
+            )
         }
     }
 
@@ -111,3 +142,7 @@ class DbController : Controller() {
         TransactionManager.manager.defaultIsolationLevel = Connection.TRANSACTION_SERIALIZABLE
     }
 }
+
+class InsensitiveLikeOp(expr1: Expression<*>, expr2: Expression<*>) : ComparisonOp(expr1, expr2, "ILIKE")
+
+infix fun <T : String?> ExpressionWithColumnType<T>.ilike(pattern: String): Op<Boolean> = InsensitiveLikeOp(this, QueryParameter(pattern, columnType))

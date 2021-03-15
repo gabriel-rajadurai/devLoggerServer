@@ -1,6 +1,7 @@
 package com.example.demo.view
 
 import com.example.demo.Connection
+import com.example.demo.app.LogLevel
 import com.example.demo.controller.DbController
 import com.example.demo.viewModel.LogViewModel
 import com.google.gson.Gson
@@ -12,9 +13,13 @@ import io.ktor.server.engine.*
 import io.ktor.server.netty.*
 import io.ktor.websocket.*
 import javafx.application.Platform
+import javafx.beans.property.SimpleObjectProperty
 import javafx.beans.property.SimpleStringProperty
 import javafx.collections.ObservableList
-import javafx.collections.ObservableSet
+import javafx.geometry.Orientation
+import javafx.scene.layout.StackPane
+import javafx.scene.paint.Color
+import javafx.scene.paint.Paint
 import tornadofx.*
 import java.net.InetAddress
 import java.time.Instant
@@ -36,6 +41,8 @@ class MainView : View("Dev Logs") {
     var connectionStatus = SimpleStringProperty()
 
     private val selectedUser = SimpleStringProperty()
+    private val selectedLogLevel = SimpleObjectProperty<LogLevel>()
+    private val searchText = SimpleStringProperty()
 
     private val server by lazy { Server() }
 
@@ -69,54 +76,130 @@ class MainView : View("Dev Logs") {
                 }
             }
 
-            add(ConnectionView())
+//            add(ConnectionView())
 
-            val filteredLogs = SortedFilteredList(logs)
-            hbox {
-                //Filter user
-                combobox<String> {
-                    valueProperty().bindBidirectional(selectedUser)
-                    promptText = "Select Device"
-                    selectionModel.selectedItemProperty()
-                    isEditable = true
-                    isEditable = false
-                    items = users
-                }.apply {
+            vbox {
+                val filteredLogs = SortedFilteredList(logs)
+                hbox {
+                    //Filter user
+                    combobox<String> {
+                        items = users
+                        valueProperty().bindBidirectional(selectedUser)
+                        promptText = "Select Device"
+
+                        cellFormat {
+                            text = it
+                        }
+                    }
+
+                    selectedUser.onChange {
+                        dbController.filterLogs(it, selectedLogLevel.value, searchText.value) //Send logLevel here as well
+                    }
+
+                    separator(Orientation.VERTICAL)
+
+                    combobox(values = LogLevel.values().toMutableList<LogLevel?>().apply {
+                        add(0, null)
+                    }) {
+                        bindSelected(selectedLogLevel)
+                        cellFormat {
+                            text = it?.name ?: ""
+                            textFill = when (it) {
+                                LogLevel.VERBOSE -> Paint.valueOf(Color.GRAY.toString())
+                                LogLevel.DEBUG -> Paint.valueOf(Color.BLACK.toString())
+                                LogLevel.INFO -> Paint.valueOf(Color.BLUE.toString())
+                                LogLevel.WARNING -> Paint.valueOf(Color.ORANGE.darker().toString())
+                                LogLevel.ERROR -> Paint.valueOf(Color.RED.toString())
+                                else -> Paint.valueOf(Color.WHITE.darker().toString())
+                            }
+                        }
+                    }
+
+                    selectedLogLevel.onChange {
+                        dbController.filterLogs(selectedUser.value, it, searchText.value)
+                    }
+
+                    separator(Orientation.VERTICAL)
+
+                    //Search functionality
+                    combobox<String> {
+                        items = tags
+                        isEditable = true
+                        searchText.bind(editor.textProperty())
+                        promptText = "Enter TAG here"
+
+                        cellFormat {
+                            text = it
+                        }
+                    }
+                    searchText.onChange {
+                        dbController.filterLogs(
+                                selectedUser.value,
+                                selectedLogLevel.value,
+                                it
+                        )
+                    }
+                }
+
+                listview<LogViewModel> {
+                    items = filteredLogs.bindTo(this)
+
                     cellFormat {
-                        text = it
-                    }
-                }
+                        //For wrapping text
+                        minWidth = width
+                        maxWidth = width
+                        prefWidth = width
+                        isWrapText = true
 
-                selectedUser.onChange {
-                    dbController.filterByUser(it)
-                }
+                        val formattedTime = LocalDateTime.ofInstant(
+                                Instant.ofEpochMilli(item.timeInMillis.value),
+                                ZoneId.systemDefault()
+                        ).format(DateTimeFormatter.ofPattern("dd MMM yyyy, hh.mm:ss a"))
+                        //TODO Bold the Tag, and maybe the time as well ? Use TextFlow
+                        text = "$formattedTime - ${item.tag.value} - ${item.message.value}"
 
-                //Search functionality
-                combobox<String> {
-                    isEditable = true
-                    filteredLogs.filterWhen(editor.textProperty()) { query, item ->
-                        item.tag.value.contains(query)
+                        //Color coding for the various log levels
+                        textFill = when (item.logLevel.value) {
+                            2 -> Paint.valueOf(Color.GRAY.toString())
+                            3 -> Paint.valueOf(Color.BLACK.toString())
+                            4 -> Paint.valueOf(Color.BLUE.toString())
+                            5 -> Paint.valueOf(Color.ORANGE.darker().toString())
+                            6 -> Paint.valueOf(Color.RED.toString())
+                            else -> Paint.valueOf(Color.GRAY.toString())
+                        }
                     }
-                    promptText = "Enter TAG here"
-                    items = tags
-                }.cellFormat {
-                    text = it
                 }
             }
 
-            tableview<LogViewModel> {
-                logTable = editModel
-                items = filteredLogs.bindTo(this)
+            bottom = hbox bottom@{
+                add(ConnectionView())
+                spacer()
 
-                column("Time", LogViewModel::timeInMillis).cellFormat {
-                    val time = Instant.ofEpochMilli(it)
-                    text = LocalDateTime.ofInstant(time, ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("dd MMM yyyy, hh.mm:ss a"))
+                fun logColorDef(color: Color, logLevel: LogLevel): StackPane {
+                    return stackpane {
+                        rectangle {
+                            widthProperty().bind(this@bottom.heightProperty())
+                            heightProperty().bind(this@bottom.heightProperty())
+                            fill = Paint.valueOf(color.toString())
+                        }
+                        when (logLevel) {
+                            LogLevel.VERBOSE -> text("V")
+                            LogLevel.DEBUG -> text("D") {
+                                fill = Paint.valueOf(Color.WHITE.toString())
+                            }
+                            LogLevel.INFO -> text("I") {
+                                fill = Paint.valueOf(Color.WHITE.toString())
+                            }
+                            LogLevel.WARNING -> text("W")
+                            LogLevel.ERROR -> text("E")
+                        }
+                    }
                 }
-                column("Tag", LogViewModel::tag)
-                column("Level", LogViewModel::logLevel)
-                column("Message", LogViewModel::message) {
-                    enableTextWrap()
-                }
+                add(logColorDef(Color.GRAY, LogLevel.VERBOSE))
+                add(logColorDef(Color.BLACK, LogLevel.DEBUG))
+                add(logColorDef(Color.BLUE, LogLevel.INFO))
+                add(logColorDef(Color.ORANGE.darker(), LogLevel.WARNING))
+                add(logColorDef(Color.RED, LogLevel.ERROR))
             }
         }
     }
@@ -131,7 +214,9 @@ class MainView : View("Dev Logs") {
         private val socketConnection by lazy {
             embeddedServer(Netty, port = 8080) {
                 install(WebSockets)
-                connectionStatus.value = "Listening at ${InetAddress.getLocalHost()}"
+                Platform.runLater {
+                    connectionStatus.value = "Listening at ${InetAddress.getLocalHost()}"
+                }
                 routing {
                     val connections = Collections.synchronizedSet<Connection?>(LinkedHashSet())
                     webSocket("/log/") {
@@ -184,9 +269,8 @@ class MainView : View("Dev Logs") {
     }
 
     inner class ConnectionView : View() {
-        override val root = textarea(connectionStatus) {
+        override val root = label(connectionStatus) {
             maxHeight = (text.lines().count() * 2).toDouble()
-            isEditable = false
         }
 
     }
