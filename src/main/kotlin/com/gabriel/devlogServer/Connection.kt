@@ -1,4 +1,4 @@
-package com.example.demo
+package com.gabriel.devlogServer
 
 import io.ktor.http.cio.websocket.*
 import java.util.concurrent.atomic.AtomicInteger

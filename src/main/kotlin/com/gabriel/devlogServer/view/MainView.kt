@@ -1,9 +1,9 @@
-package com.example.demo.view
+package com.gabriel.devlogServer.view
 
-import com.example.demo.Connection
-import com.example.demo.app.LogLevel
-import com.example.demo.controller.DbController
-import com.example.demo.viewModel.LogViewModel
+import com.gabriel.devlogServer.Connection
+import com.gabriel.devlogServer.app.LogLevel
+import com.gabriel.devlogServer.controller.DbController
+import com.gabriel.devlogServer.viewModel.LogViewModel
 import com.google.gson.Gson
 import com.google.gson.JsonObject
 import io.ktor.application.*

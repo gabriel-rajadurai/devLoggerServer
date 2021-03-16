@@ -1,4 +1,4 @@
-package com.example.demo.app
+package com.gabriel.devlogServer.app
 
 import javafx.scene.text.FontWeight
 import tornadofx.Stylesheet

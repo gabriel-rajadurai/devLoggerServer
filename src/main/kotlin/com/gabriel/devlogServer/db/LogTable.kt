@@ -1,4 +1,4 @@
-package com.example.demo.db
+package com.gabriel.devlogServer.db
 
 import org.jetbrains.exposed.dao.IntEntity
 import org.jetbrains.exposed.dao.IntEntityClass

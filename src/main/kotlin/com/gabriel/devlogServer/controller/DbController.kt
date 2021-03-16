@@ -1,9 +1,9 @@
-package com.example.demo.controller
+package com.gabriel.devlogServer.controller
 
-import com.example.demo.app.LogLevel
-import com.example.demo.db.LogMessage
-import com.example.demo.db.LogTable
-import com.example.demo.viewModel.LogViewModel
+import com.gabriel.devlogServer.app.LogLevel
+import com.gabriel.devlogServer.db.LogMessage
+import com.gabriel.devlogServer.db.LogTable
+import com.gabriel.devlogServer.viewModel.LogViewModel
 import com.google.gson.JsonObject
 import javafx.application.Platform
 import javafx.collections.ObservableList

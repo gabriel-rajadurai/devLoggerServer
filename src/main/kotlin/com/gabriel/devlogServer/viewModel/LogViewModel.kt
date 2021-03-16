@@ -1,6 +1,6 @@
-package com.example.demo.viewModel
+package com.gabriel.devlogServer.viewModel
 
-import com.example.demo.db.LogMessage
+import com.gabriel.devlogServer.db.LogMessage
 import tornadofx.ItemViewModel
 
 class LogViewModel : ItemViewModel<LogMessage>() {

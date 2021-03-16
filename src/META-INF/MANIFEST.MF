@@ -1,0 +1,23 @@
+Manifest-Version: 1.0
+Main-Class: com.example.demo.app.MyApp
+Class-Path: javax.json-api-1.1.2.jar javax.json-1.1.2.jar javafx-graphic
+ s-15.0.1-mac.jar ktor-io-jvm-1.4.1.jar sqlite-jdbc-3.25.2.jar ktor-serv
+ er-host-common-jvm-1.4.1.jar ktor-websockets-jvm-1.4.1.jar netty-codec-
+ http-4.1.51.Final.jar kotlinx-coroutines-jdk8-1.3.9-native-mt-2.jar exp
+ osed-core-0.29.1.jar kotlin-stdlib-jdk7-1.4.10.jar ktor-network-jvm-1.4
+ .1.jar javafx-base-15.0.1.jar kotlin-stdlib-1.4.21.jar tornadofx-1.7.20
+ .jar netty-resolver-4.1.51.Final.jar netty-handler-4.1.51.Final.jar jav
+ afx-fxml-15.0.1-mac.jar kotlin-reflect-1.4.21.jar netty-transport-nativ
+ e-epoll-4.1.51.Final.jar javafx-controls-15.0.1-mac.jar ktor-server-cor
+ e-jvm-1.4.1.jar kotlinx-coroutines-core-jvm-1.4.1.jar netty-common-4.1.
+ 51.Final.jar netty-codec-http2-4.1.51.Final.jar kotlin-stdlib-common-1.
+ 4.21.jar netty-transport-native-kqueue-4.1.51.Final.jar exposed-dao-0.2
+ 9.1.jar javafx-controls-15.0.1.jar ktor-server-netty-jvm-1.4.1.jar slf4
+ j-api-1.7.30.jar config-1.3.1.jar netty-transport-4.1.51.Final.jar ktor
+ -http-cio-jvm-1.4.1.jar ktor-http-jvm-1.4.1.jar netty-buffer-4.1.51.Fin
+ al.jar javafx-graphics-15.0.1.jar ktor-utils-jvm-1.4.1.jar alpn-api-1.1
+ .3.v20160715.jar annotations-13.0.jar javafx-base-15.0.1-mac.jar kotlin
+ -stdlib-jdk8-1.4.10.jar netty-codec-4.1.51.Final.jar exposed-jdbc-0.29.
+ 1.jar tornadofx-controls-1.0.4.jar netty-transport-native-unix-common-4
+ .1.51.Final.jar gson-2.8.6.jar
+
