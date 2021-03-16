@@ -6,6 +6,7 @@ import tornadofx.App
 class MyApp : App(MainView::class, Styles::class)
 
 enum class LogLevel(val level: Int) {
+    ALL(1),
     VERBOSE(2),
     DEBUG(3),
     INFO(4),

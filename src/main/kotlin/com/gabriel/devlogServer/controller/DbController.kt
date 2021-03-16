@@ -105,24 +105,25 @@ class DbController : Controller() {
         }
     }
 
-    fun filterLogs(userId: String?, logLevel: LogLevel?, searchText: String?) {
+    fun filterLogs(userId: String?, logLevel: LogLevel, searchText: String?) {
+        val filterLogLevel = if (logLevel == LogLevel.ALL) null else logLevel
         transaction {
             logs.clear()
             logs.addAll(
                     when {
-                        userId == null && logLevel == null && searchText.isNullOrBlank() -> {
+                        userId == null && filterLogLevel == null && searchText.isNullOrBlank() -> {
                             LogMessage.all()
                         }
                         else -> {
                             LogMessage.find {
                                 when {
-                                    userId == null && logLevel == null && !searchText.isNullOrBlank() -> LogTable.tag like "%$searchText%"
-                                    userId == null && logLevel != null && searchText.isNullOrBlank() -> LogTable.logLevel eq logLevel.level
-                                    userId != null && logLevel == null && searchText.isNullOrBlank() -> LogTable.userId eq userId
-                                    userId != null && logLevel == null && !searchText.isNullOrBlank() -> (LogTable.userId eq userId) and (LogTable.tag like "%$searchText%")
-                                    userId != null && logLevel != null && searchText.isNullOrBlank() -> (LogTable.userId eq userId) and (LogTable.logLevel eq logLevel.level)
-                                    userId == null && logLevel != null && !searchText.isNullOrBlank() -> (LogTable.logLevel eq logLevel.level) and (LogTable.tag like "%$searchText%")
-                                    else -> (LogTable.logLevel eq logLevel!!.level) and
+                                    userId == null && filterLogLevel == null && !searchText.isNullOrBlank() -> LogTable.tag like "%$searchText%"
+                                    userId == null && filterLogLevel != null && searchText.isNullOrBlank() -> LogTable.logLevel eq filterLogLevel.level
+                                    userId != null && filterLogLevel == null && searchText.isNullOrBlank() -> LogTable.userId eq userId
+                                    userId != null && filterLogLevel == null && !searchText.isNullOrBlank() -> (LogTable.userId eq userId) and (LogTable.tag like "%$searchText%")
+                                    userId != null && filterLogLevel != null && searchText.isNullOrBlank() -> (LogTable.userId eq userId) and (LogTable.logLevel eq filterLogLevel.level)
+                                    userId == null && filterLogLevel != null && !searchText.isNullOrBlank() -> (LogTable.logLevel eq filterLogLevel.level) and (LogTable.tag like "%$searchText%")
+                                    else -> (LogTable.logLevel eq filterLogLevel!!.level) and
                                             (LogTable.userId eq userId!!) and (LogTable.tag like "%$searchText%")
                                 }
                             }

@@ -19,6 +19,7 @@ import javafx.collections.ObservableList
 import javafx.event.EventTarget
 import javafx.geometry.Orientation
 import javafx.geometry.Pos
+import javafx.scene.control.ButtonBar
 import javafx.scene.layout.Priority
 import javafx.scene.layout.StackPane
 import javafx.scene.paint.Color
@@ -64,85 +65,63 @@ class MainView : View("Dev Logs") {
                 """.trimMargin()
         }
 
+        minWidth = 600.0
+
         top = menubar {
             //TODO This is not working correctly. Commenting it out for now
             //useSystemMenuBarProperty().value = true
             menu("File") {
-                item("Exit") {
-                    setOnAction {
-                        close()
-                    }
+                item("Exit").action {
+                    close()
                 }
-                item("About") {
-                    setOnAction {
-                        //Show about dialog
-                        val aboutDialog = dialog(title = "About", stageStyle = StageStyle.UTILITY) {
-                            text = "Dev Log Server - Version 1.0"
-                            stage.resizableProperty().value = false
-                        }
-                        aboutDialog?.show()
+                item("About").action {
+                    //Show about dialog
+                    val aboutDialog = dialog(title = "About", stageStyle = StageStyle.UTILITY) {
+                        text = "Dev Log Server - Version 1.0"
+                        stage.resizableProperty().value = false
                     }
+                    aboutDialog?.show()
                 }
             }
         }
 
         center = vbox {
-            buttonbar {
-                vboxConstraints {
-                    marginRight = 8.0
-                    marginTop = 4.0
-                    marginBottom = 4.0
-                }
-                button("Delete All") {
-                    setOnAction {
-                        dbController.deleteAll()
-                    }
-                }
-                button("Start Server") {
-                    setOnAction {
-                        connectionStatus.value = "Connecting"
-                        server.start()
-                        isDisable = true
+            separator(Orientation.HORIZONTAL) {
+                fitToParentWidth()
+            }
+
+            filtersView()
+
+            listview<LogViewModel> {
+                items = logs
+                cellFormat {
+                    //For wrapping text
+                    minWidth = width
+                    maxWidth = width
+                    prefWidth = width
+                    isWrapText = true
+
+                    val formattedTime = LocalDateTime.ofInstant(
+                            Instant.ofEpochMilli(item.timeInMillis.value),
+                            ZoneId.systemDefault()
+                    ).format(DateTimeFormatter.ofPattern("dd MMM yyyy, hh.mm:ss a"))
+                    //TODO Bold the Tag, and maybe the time as well ? Use TextFlow
+                    text = "$formattedTime - ${item.tag.value} - ${item.message.value}"
+
+                    //Color coding for the various log levels
+                    textFill = when (item.logLevel.value) {
+                        2 -> Paint.valueOf(Color.GRAY.toString())
+                        3 -> Paint.valueOf(Color.BLACK.toString())
+                        4 -> Paint.valueOf(Color.BLUE.toString())
+                        5 -> Paint.valueOf(Color.ORANGE.darker().toString())
+                        6 -> Paint.valueOf(Color.RED.toString())
+                        else -> Paint.valueOf(Color.GRAY.toString())
                     }
                 }
             }
-
-            vbox {
-                separator(Orientation.HORIZONTAL)
-
-                filtersView()
-
-                listview<LogViewModel> {
-                    items = logs
-                    cellFormat {
-                        //For wrapping text
-                        minWidth = width
-                        maxWidth = width
-                        prefWidth = width
-                        isWrapText = true
-
-                        val formattedTime = LocalDateTime.ofInstant(
-                                Instant.ofEpochMilli(item.timeInMillis.value),
-                                ZoneId.systemDefault()
-                        ).format(DateTimeFormatter.ofPattern("dd MMM yyyy, hh.mm:ss a"))
-                        //TODO Bold the Tag, and maybe the time as well ? Use TextFlow
-                        text = "$formattedTime - ${item.tag.value} - ${item.message.value}"
-
-                        //Color coding for the various log levels
-                        textFill = when (item.logLevel.value) {
-                            2 -> Paint.valueOf(Color.GRAY.toString())
-                            3 -> Paint.valueOf(Color.BLACK.toString())
-                            4 -> Paint.valueOf(Color.BLUE.toString())
-                            5 -> Paint.valueOf(Color.ORANGE.darker().toString())
-                            6 -> Paint.valueOf(Color.RED.toString())
-                            else -> Paint.valueOf(Color.GRAY.toString())
-                        }
-                    }
-                }
-            }
-
-            bottom = appStatusView()
         }
+
+        bottom = appStatusView()
     }
 
     override fun onDock() {
@@ -172,37 +151,40 @@ class MainView : View("Dev Logs") {
                 marginBottom = 8.0
                 marginLeft = 8.0
                 marginRight = 20.0
-                hGrow = Priority.ALWAYS
             }
+            fitToParentWidth()
         }
         selectedUser.onChange {
-            dbController.filterLogs(it, selectedLogLevel.value, searchText.value) //Send logLevel here as well
+            dbController.filterLogs(
+                    it,
+                    selectedLogLevel.value ?: LogLevel.ALL,
+                    searchText.value
+            )
         }
 
-        combobox(values = LogLevel.values().toMutableList<LogLevel?>().apply {
-            add(0, null)
-        }) {
+        combobox(values = LogLevel.values().toList()) {
             bindSelected(selectedLogLevel)
+            promptText = "Select Log Level"
             cellFormat {
-                text = it?.name ?: ""
+                text = item.name
                 textFill = when (it) {
                     LogLevel.VERBOSE -> Paint.valueOf(Color.GRAY.toString())
                     LogLevel.DEBUG -> Paint.valueOf(Color.BLACK.toString())
                     LogLevel.INFO -> Paint.valueOf(Color.BLUE.toString())
                     LogLevel.WARNING -> Paint.valueOf(Color.ORANGE.darker().toString())
                     LogLevel.ERROR -> Paint.valueOf(Color.RED.toString())
-                    else -> Paint.valueOf(Color.WHITE.darker().toString())
+                    LogLevel.ALL -> Paint.valueOf(Color.GRAY.darker().toString())
                 }
             }
             hboxConstraints {
                 marginTop = 8.0
                 marginBottom = 8.0
                 marginRight = 20.0
-                hGrow = Priority.ALWAYS
             }
+            fitToParentWidth()
         }
         selectedLogLevel.onChange {
-            dbController.filterLogs(selectedUser.value, it, searchText.value)
+            dbController.filterLogs(selectedUser.value, it ?: LogLevel.ALL, searchText.value)
         }
 
         //Search functionality
@@ -219,13 +201,13 @@ class MainView : View("Dev Logs") {
                 marginTop = 8.0
                 marginBottom = 8.0
                 marginRight = 8.0
-                hGrow = Priority.ALWAYS
             }
+            fitToParentWidth()
         }
         searchText.onChange {
             dbController.filterLogs(
                     selectedUser.value,
-                    selectedLogLevel.value,
+                    selectedLogLevel.value ?: LogLevel.ALL,
                     it
             )
         }
@@ -238,10 +220,33 @@ class MainView : View("Dev Logs") {
         alignment?.let {
             this.alignment = it
         }
+
         add(ConnectionStatusView(connectionStatus))
+
         spacer()
 
-        fun logColorDef(color: Color, logLevel: LogLevel): StackPane {
+        buttonbar {
+            hboxConstraints {
+                marginTop = 8.0
+                marginBottom = 8.0
+                marginLeft = 8.0
+                marginRight = 8.0
+            }
+            button("Delete All") {
+                setOnAction {
+                    dbController.deleteAll()
+                }
+            }
+            button("Start Server") {
+                setOnAction {
+                    connectionStatus.value = "Connecting"
+                    server.start()
+                    isDisable = true
+                }
+            }
+        }
+
+        /*fun logColorDef(color: Color, logLevel: LogLevel): StackPane {
             return stackpane {
                 rectangle {
                     widthProperty().bind(this@hbox.heightProperty())
@@ -265,7 +270,7 @@ class MainView : View("Dev Logs") {
         add(logColorDef(Color.BLACK, LogLevel.DEBUG))
         add(logColorDef(Color.BLUE, LogLevel.INFO))
         add(logColorDef(Color.ORANGE.darker(), LogLevel.WARNING))
-        add(logColorDef(Color.RED, LogLevel.ERROR))
+        add(logColorDef(Color.RED, LogLevel.ERROR))*/
     }
 
     //TODO Find ways to move this to its own class.
