@@ -44,6 +44,14 @@ class DbController : Controller() {
         }
     }
 
+    val processes: ObservableList<String> by lazy {
+        transaction {
+            LogMessage.all().distinctBy { it.processName }.map {
+                it.processName
+            }.asObservable()
+        }
+    }
+
     fun addUser(userId: String) {
         if (users.contains(userId)) return
         Platform.runLater {
@@ -51,21 +59,31 @@ class DbController : Controller() {
         }
     }
 
-    fun insertLog(userId: String, messageJson: JsonObject) {
+    fun addProcess(processName: String) {
+        if (processes.contains(processName)) return
+        Platform.runLater {
+            processes.add(processName)
+        }
+    }
+
+    fun insertLog(userId: String, processName: String, messageJson: JsonObject) {
         transaction {
             val log = LogMessage.new {
                 this.userId = userId
+                this.processName = processName
                 logLevel = messageJson["logLevel"].asInt
                 tag = messageJson["tag"].asString
                 timeInMillis = messageJson["timeMills"].asLong
                 message = messageJson["message"].asString
             }
-            if (!tags.contains(log.tag)) {
-                tags.add(log.tag)
+            Platform.runLater {
+                if (!tags.contains(log.tag)) {
+                    tags.add(log.tag)
+                }
+                logs.add(LogViewModel().apply {
+                    item = log
+                })
             }
-            logs.add(LogViewModel().apply {
-                item = log
-            })
         }
     }
 
@@ -86,46 +104,60 @@ class DbController : Controller() {
         }
     }
 
-    private fun filterOnlyByUser(userId: String?) {
-        transaction {
-            logs.clear()
-            logs.addAll(
-                    if (userId == null) {
-                        LogMessage.all()
-                    } else {
-                        LogMessage.find {
-                            LogTable.userId eq userId
-                        }
-                    }.map {
-                        LogViewModel().apply {
-                            item = it
-                        }
-                    }
-            )
-        }
-    }
-
-    fun filterLogs(userId: String?, logLevel: LogLevel, searchText: String?) {
+    //TODO Simplify query
+    fun filterLogs(userId: String?, selectedProcess: String?, logLevel: LogLevel, searchText: String?) {
         val filterLogLevel = if (logLevel == LogLevel.ALL) null else logLevel
         transaction {
             logs.clear()
             logs.addAll(
                     when {
-                        userId == null && filterLogLevel == null && searchText.isNullOrBlank() -> {
+                        userId == null && filterLogLevel == null && searchText.isNullOrBlank() && selectedProcess == null -> {
                             LogMessage.all()
                         }
                         else -> {
                             LogMessage.find {
-                                when {
-                                    userId == null && filterLogLevel == null && !searchText.isNullOrBlank() -> LogTable.tag like "%$searchText%"
-                                    userId == null && filterLogLevel != null && searchText.isNullOrBlank() -> LogTable.logLevel eq filterLogLevel.level
-                                    userId != null && filterLogLevel == null && searchText.isNullOrBlank() -> LogTable.userId eq userId
-                                    userId != null && filterLogLevel == null && !searchText.isNullOrBlank() -> (LogTable.userId eq userId) and (LogTable.tag like "%$searchText%")
-                                    userId != null && filterLogLevel != null && searchText.isNullOrBlank() -> (LogTable.userId eq userId) and (LogTable.logLevel eq filterLogLevel.level)
-                                    userId == null && filterLogLevel != null && !searchText.isNullOrBlank() -> (LogTable.logLevel eq filterLogLevel.level) and (LogTable.tag like "%$searchText%")
-                                    else -> (LogTable.logLevel eq filterLogLevel!!.level) and
-                                            (LogTable.userId eq userId!!) and (LogTable.tag like "%$searchText%")
+                                val userIdOp = userId?.let {
+                                    LogTable.userId eq it
                                 }
+                                val processOp = selectedProcess?.let {
+                                    LogTable.processName eq it
+                                }
+                                val logLevelOp = filterLogLevel?.let {
+                                    LogTable.logLevel eq it.level
+                                }
+                                val searchOp = if (searchText.isNullOrBlank())
+                                    null
+                                else
+                                    LogTable.tag like "%$searchText%"
+
+                                userIdOp?.let {
+                                    var filterOp = it
+                                    processOp?.let { pOp ->
+                                        filterOp = filterOp.and(pOp)
+                                    }
+                                    logLevelOp?.let { lOp ->
+                                        filterOp = filterOp.and(lOp)
+                                    }
+                                    searchOp?.let { sOp ->
+                                        filterOp = filterOp.and(sOp)
+                                    }
+                                    filterOp
+                                } ?: processOp?.let {
+                                    var filterOp = it
+                                    logLevelOp?.let { lOp ->
+                                        filterOp = filterOp.and(lOp)
+                                    }
+                                    searchOp?.let { sOp ->
+                                        filterOp = filterOp.and(sOp)
+                                    }
+                                    filterOp
+                                } ?: logLevelOp?.let {
+                                    var filterOp = it
+                                    searchOp?.let { sOp ->
+                                        filterOp = filterOp.and(sOp)
+                                    }
+                                    filterOp
+                                } ?: searchOp ?: throw IllegalArgumentException("")
                             }
                         }
                     }.map {

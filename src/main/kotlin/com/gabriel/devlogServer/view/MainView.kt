@@ -41,10 +41,12 @@ class MainView : View("Dev Logs") {
     var logs: ObservableList<LogViewModel> by singleAssign()
     var tags: ObservableList<String> by singleAssign()
     var users: ObservableList<String> by singleAssign()
+    var processes: ObservableList<String> by singleAssign()
 
     var connectionStatus = SimpleStringProperty()
 
     private val selectedUser = SimpleStringProperty()
+    private val selectedProcess = SimpleStringProperty()
     private val selectedLogLevel = SimpleObjectProperty<LogLevel>()
     private val searchText = SimpleStringProperty()
 
@@ -57,6 +59,7 @@ class MainView : View("Dev Logs") {
         logs = dbController.logs
         tags = dbController.tags
         users = dbController.users
+        processes = dbController.processes
 
         connectionStatus.value = "Disconnected"
         connectionStatus.stringBinding {
@@ -157,6 +160,31 @@ class MainView : View("Dev Logs") {
         selectedUser.onChange {
             dbController.filterLogs(
                     it,
+                    selectedProcess.value,
+                    selectedLogLevel.value ?: LogLevel.ALL,
+                    searchText.value
+            )
+        }
+
+        //Filter process
+        combobox<String> {
+            items = processes
+            valueProperty().bindBidirectional(selectedProcess)
+            promptText = "Select Process"
+            cellFormat {
+                text = it
+            }
+            hboxConstraints {
+                marginTop = 8.0
+                marginBottom = 8.0
+                marginRight = 20.0
+            }
+            fitToParentWidth()
+        }
+        selectedProcess.onChange {
+            dbController.filterLogs(
+                    selectedUser.value,
+                    it,
                     selectedLogLevel.value ?: LogLevel.ALL,
                     searchText.value
             )
@@ -184,7 +212,7 @@ class MainView : View("Dev Logs") {
             fitToParentWidth()
         }
         selectedLogLevel.onChange {
-            dbController.filterLogs(selectedUser.value, it ?: LogLevel.ALL, searchText.value)
+            dbController.filterLogs(selectedUser.value, selectedProcess.value, it ?: LogLevel.ALL, searchText.value)
         }
 
         //Search functionality
@@ -207,6 +235,7 @@ class MainView : View("Dev Logs") {
         searchText.onChange {
             dbController.filterLogs(
                     selectedUser.value,
+                    selectedProcess.value,
                     selectedLogLevel.value ?: LogLevel.ALL,
                     it
             )
@@ -300,10 +329,15 @@ class MainView : View("Dev Logs") {
                                     Platform.runLater {
                                         selectedUser.value = thisConnection.name
                                     }
+                                    thisConnection.process = messageJson["PROCESS"].asString
+                                    Platform.runLater {
+                                        selectedProcess.value = thisConnection.process
+                                    }
                                     dbController.addUser(thisConnection.name)
+                                    dbController.addProcess(thisConnection.process)
                                     println("Adding user! ${thisConnection.name}")
                                 } else {
-                                    dbController.insertLog(thisConnection.name, messageJson)
+                                    dbController.insertLog(thisConnection.name, thisConnection.process, messageJson)
                                     println(messageJson)
                                 }
                             }
