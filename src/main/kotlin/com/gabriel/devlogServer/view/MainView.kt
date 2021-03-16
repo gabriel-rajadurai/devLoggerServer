@@ -16,10 +16,14 @@ import javafx.application.Platform
 import javafx.beans.property.SimpleObjectProperty
 import javafx.beans.property.SimpleStringProperty
 import javafx.collections.ObservableList
+import javafx.event.EventTarget
 import javafx.geometry.Orientation
+import javafx.geometry.Pos
+import javafx.scene.layout.Priority
 import javafx.scene.layout.StackPane
 import javafx.scene.paint.Color
 import javafx.scene.paint.Paint
+import javafx.stage.StageStyle
 import tornadofx.*
 import java.net.InetAddress
 import java.time.Instant
@@ -33,7 +37,6 @@ import kotlin.concurrent.thread
 class MainView : View("Dev Logs") {
 
     val dbController: DbController by inject()
-    var logTable: TableViewEditModel<LogViewModel> by singleAssign()
     var logs: ObservableList<LogViewModel> by singleAssign()
     var tags: ObservableList<String> by singleAssign()
     var users: ObservableList<String> by singleAssign()
@@ -60,8 +63,36 @@ class MainView : View("Dev Logs") {
                     |${connectionStatus.value}
                 """.trimMargin()
         }
+
+        top = menubar {
+            //TODO This is not working correctly. Commenting it out for now
+            //useSystemMenuBarProperty().value = true
+            menu("File") {
+                item("Exit") {
+                    setOnAction {
+                        close()
+                    }
+                }
+                item("About") {
+                    setOnAction {
+                        //Show about dialog
+                        val aboutDialog = dialog(title = "About", stageStyle = StageStyle.UTILITY) {
+                            text = "Dev Log Server - Version 1.0"
+                            stage.resizableProperty().value = false
+                        }
+                        aboutDialog?.show()
+                    }
+                }
+            }
+        }
+
         center = vbox {
             buttonbar {
+                vboxConstraints {
+                    marginRight = 8.0
+                    marginTop = 4.0
+                    marginBottom = 4.0
+                }
                 button("Delete All") {
                     setOnAction {
                         dbController.deleteAll()
@@ -76,74 +107,13 @@ class MainView : View("Dev Logs") {
                 }
             }
 
-//            add(ConnectionView())
-
             vbox {
-                val filteredLogs = SortedFilteredList(logs)
-                hbox {
-                    //Filter user
-                    combobox<String> {
-                        items = users
-                        valueProperty().bindBidirectional(selectedUser)
-                        promptText = "Select Device"
+                separator(Orientation.HORIZONTAL)
 
-                        cellFormat {
-                            text = it
-                        }
-                    }
-
-                    selectedUser.onChange {
-                        dbController.filterLogs(it, selectedLogLevel.value, searchText.value) //Send logLevel here as well
-                    }
-
-                    separator(Orientation.VERTICAL)
-
-                    combobox(values = LogLevel.values().toMutableList<LogLevel?>().apply {
-                        add(0, null)
-                    }) {
-                        bindSelected(selectedLogLevel)
-                        cellFormat {
-                            text = it?.name ?: ""
-                            textFill = when (it) {
-                                LogLevel.VERBOSE -> Paint.valueOf(Color.GRAY.toString())
-                                LogLevel.DEBUG -> Paint.valueOf(Color.BLACK.toString())
-                                LogLevel.INFO -> Paint.valueOf(Color.BLUE.toString())
-                                LogLevel.WARNING -> Paint.valueOf(Color.ORANGE.darker().toString())
-                                LogLevel.ERROR -> Paint.valueOf(Color.RED.toString())
-                                else -> Paint.valueOf(Color.WHITE.darker().toString())
-                            }
-                        }
-                    }
-
-                    selectedLogLevel.onChange {
-                        dbController.filterLogs(selectedUser.value, it, searchText.value)
-                    }
-
-                    separator(Orientation.VERTICAL)
-
-                    //Search functionality
-                    combobox<String> {
-                        items = tags
-                        isEditable = true
-                        searchText.bind(editor.textProperty())
-                        promptText = "Enter TAG here"
-
-                        cellFormat {
-                            text = it
-                        }
-                    }
-                    searchText.onChange {
-                        dbController.filterLogs(
-                                selectedUser.value,
-                                selectedLogLevel.value,
-                                it
-                        )
-                    }
-                }
+                filtersView()
 
                 listview<LogViewModel> {
-                    items = filteredLogs.bindTo(this)
-
+                    items = logs
                     cellFormat {
                         //For wrapping text
                         minWidth = width
@@ -171,36 +141,7 @@ class MainView : View("Dev Logs") {
                 }
             }
 
-            bottom = hbox bottom@{
-                add(ConnectionView())
-                spacer()
-
-                fun logColorDef(color: Color, logLevel: LogLevel): StackPane {
-                    return stackpane {
-                        rectangle {
-                            widthProperty().bind(this@bottom.heightProperty())
-                            heightProperty().bind(this@bottom.heightProperty())
-                            fill = Paint.valueOf(color.toString())
-                        }
-                        when (logLevel) {
-                            LogLevel.VERBOSE -> text("V")
-                            LogLevel.DEBUG -> text("D") {
-                                fill = Paint.valueOf(Color.WHITE.toString())
-                            }
-                            LogLevel.INFO -> text("I") {
-                                fill = Paint.valueOf(Color.WHITE.toString())
-                            }
-                            LogLevel.WARNING -> text("W")
-                            LogLevel.ERROR -> text("E")
-                        }
-                    }
-                }
-                add(logColorDef(Color.GRAY, LogLevel.VERBOSE))
-                add(logColorDef(Color.BLACK, LogLevel.DEBUG))
-                add(logColorDef(Color.BLUE, LogLevel.INFO))
-                add(logColorDef(Color.ORANGE.darker(), LogLevel.WARNING))
-                add(logColorDef(Color.RED, LogLevel.ERROR))
-            }
+            bottom = appStatusView()
         }
     }
 
@@ -210,6 +151,126 @@ class MainView : View("Dev Logs") {
         }
     }
 
+    private fun EventTarget.filtersView(spacing: Double? = null, alignment: Pos? = null) = hbox {
+        spacing?.let {
+            this.spacing = it
+        }
+        alignment?.let {
+            this.alignment = it
+        }
+
+        //Filter user
+        combobox<String> {
+            items = users
+            valueProperty().bindBidirectional(selectedUser)
+            promptText = "Select Device"
+            cellFormat {
+                text = it
+            }
+            hboxConstraints {
+                marginTop = 8.0
+                marginBottom = 8.0
+                marginLeft = 8.0
+                marginRight = 20.0
+                hGrow = Priority.ALWAYS
+            }
+        }
+        selectedUser.onChange {
+            dbController.filterLogs(it, selectedLogLevel.value, searchText.value) //Send logLevel here as well
+        }
+
+        combobox(values = LogLevel.values().toMutableList<LogLevel?>().apply {
+            add(0, null)
+        }) {
+            bindSelected(selectedLogLevel)
+            cellFormat {
+                text = it?.name ?: ""
+                textFill = when (it) {
+                    LogLevel.VERBOSE -> Paint.valueOf(Color.GRAY.toString())
+                    LogLevel.DEBUG -> Paint.valueOf(Color.BLACK.toString())
+                    LogLevel.INFO -> Paint.valueOf(Color.BLUE.toString())
+                    LogLevel.WARNING -> Paint.valueOf(Color.ORANGE.darker().toString())
+                    LogLevel.ERROR -> Paint.valueOf(Color.RED.toString())
+                    else -> Paint.valueOf(Color.WHITE.darker().toString())
+                }
+            }
+            hboxConstraints {
+                marginTop = 8.0
+                marginBottom = 8.0
+                marginRight = 20.0
+                hGrow = Priority.ALWAYS
+            }
+        }
+        selectedLogLevel.onChange {
+            dbController.filterLogs(selectedUser.value, it, searchText.value)
+        }
+
+        //Search functionality
+        combobox<String> {
+            items = tags
+            isEditable = true
+            searchText.bind(editor.textProperty())
+            promptText = "Enter TAG here"
+
+            cellFormat {
+                text = it
+            }
+            hboxConstraints {
+                marginTop = 8.0
+                marginBottom = 8.0
+                marginRight = 8.0
+                hGrow = Priority.ALWAYS
+            }
+        }
+        searchText.onChange {
+            dbController.filterLogs(
+                    selectedUser.value,
+                    selectedLogLevel.value,
+                    it
+            )
+        }
+    }
+
+    private fun EventTarget.appStatusView(spacing: Double? = null, alignment: Pos? = null) = hbox {
+        spacing?.let {
+            this.spacing = it
+        }
+        alignment?.let {
+            this.alignment = it
+        }
+        add(ConnectionStatusView(connectionStatus))
+        spacer()
+
+        fun logColorDef(color: Color, logLevel: LogLevel): StackPane {
+            return stackpane {
+                rectangle {
+                    widthProperty().bind(this@hbox.heightProperty())
+                    heightProperty().bind(this@hbox.heightProperty())
+                    fill = Paint.valueOf(color.toString())
+                }
+                when (logLevel) {
+                    LogLevel.VERBOSE -> text("V")
+                    LogLevel.DEBUG -> text("D") {
+                        fill = Paint.valueOf(Color.WHITE.toString())
+                    }
+                    LogLevel.INFO -> text("I") {
+                        fill = Paint.valueOf(Color.WHITE.toString())
+                    }
+                    LogLevel.WARNING -> text("W")
+                    LogLevel.ERROR -> text("E")
+                }
+            }
+        }
+        add(logColorDef(Color.GRAY, LogLevel.VERBOSE))
+        add(logColorDef(Color.BLACK, LogLevel.DEBUG))
+        add(logColorDef(Color.BLUE, LogLevel.INFO))
+        add(logColorDef(Color.ORANGE.darker(), LogLevel.WARNING))
+        add(logColorDef(Color.RED, LogLevel.ERROR))
+    }
+
+    //TODO Find ways to move this to its own class.
+    // Currently the main issue with doing this is the [dbController] object.
+    // DbController cannot be injected into a normal class. Is it okay to use constructor initialization?
     inner class Server {
         private val socketConnection by lazy {
             embeddedServer(Netty, port = 8080) {
@@ -268,10 +329,4 @@ class MainView : View("Dev Logs") {
         }
     }
 
-    inner class ConnectionView : View() {
-        override val root = label(connectionStatus) {
-            maxHeight = (text.lines().count() * 2).toDouble()
-        }
-
-    }
 }
