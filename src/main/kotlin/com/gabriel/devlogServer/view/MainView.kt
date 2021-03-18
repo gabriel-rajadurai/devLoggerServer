@@ -1,24 +1,10 @@
 package com.gabriel.devlogServer.view
 
-import com.gabriel.devlogServer.Connection
 import com.gabriel.devlogServer.app.LogLevel
 import com.gabriel.devlogServer.app.MyApp
 import com.gabriel.devlogServer.app.SVGIcons
-import com.gabriel.devlogServer.controller.DbController
 import com.gabriel.devlogServer.viewModel.LogViewModel
-import com.google.gson.Gson
-import com.google.gson.JsonObject
-import impl.jfxtras.styles.jmetro.FluentButtonSkin
-import io.ktor.application.*
-import io.ktor.http.cio.websocket.*
-import io.ktor.routing.*
-import io.ktor.server.engine.*
-import io.ktor.server.netty.*
-import io.ktor.websocket.*
-import javafx.application.Platform
-import javafx.beans.property.SimpleObjectProperty
-import javafx.beans.property.SimpleStringProperty
-import javafx.collections.ObservableList
+import com.gabriel.devlogServer.viewModel.MainViewModel
 import javafx.event.EventTarget
 import javafx.geometry.Orientation
 import javafx.geometry.Pos
@@ -27,49 +13,21 @@ import javafx.scene.paint.Paint
 import javafx.stage.StageStyle
 import jfxtras.styles.jmetro.JMetroStyleClass
 import tornadofx.*
-import java.net.InetAddress
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import java.util.*
-import kotlin.concurrent.thread
 
 
 class MainView : View("Dev Logs") {
 
-    val dbController: DbController by inject()
-    var logs: ObservableList<LogViewModel> by singleAssign()
-    var tags: ObservableList<String> by singleAssign()
-    var users: ObservableList<String> by singleAssign()
-    var processes: ObservableList<String> by singleAssign()
-
-    var connectionStatus = SimpleStringProperty()
-
-    private val selectedUser = SimpleStringProperty()
-    private val selectedProcess = SimpleStringProperty()
-    private val selectedLogLevel = SimpleObjectProperty<LogLevel>()
-    private val searchText = SimpleStringProperty()
-
-    private val server by lazy { Server() }
+    private val viewModel : MainViewModel by inject()
 
     override val root = borderpane {
 
         styleClass.add(JMetroStyleClass.BACKGROUND)
 
-        dbController.createTable()
-
-        logs = dbController.logs
-        tags = dbController.tags
-        users = dbController.users
-        processes = dbController.processes
-
-        connectionStatus.value = "Disconnected"
-        connectionStatus.stringBinding {
-            """Connection Status
-                    |${connectionStatus.value}
-                """.trimMargin()
-        }
+        viewModel.createTable()
 
         minWidth = 600.0
         minHeight = 600.0
@@ -121,7 +79,7 @@ class MainView : View("Dev Logs") {
             filtersView()
 
             listview<LogViewModel> {
-                items = logs
+                items = viewModel.logs
                 cellFormat {
                     //For wrapping text
                     minWidth = width
@@ -157,7 +115,7 @@ class MainView : View("Dev Logs") {
 
     override fun onDock() {
         currentWindow?.setOnCloseRequest {
-            server.stop()
+            viewModel.stopServer()
         }
     }
 
@@ -171,8 +129,8 @@ class MainView : View("Dev Logs") {
 
         //Filter user
         combobox<String> {
-            items = users
-            valueProperty().bindBidirectional(selectedUser)
+            items = viewModel.users
+            valueProperty().bindBidirectional(viewModel.selectedUser)
             promptText = "Select Device"
             cellFormat {
                 text = it
@@ -185,20 +143,11 @@ class MainView : View("Dev Logs") {
             }
             fitToParentWidth()
         }
-        selectedUser.onChange {
-            dbController.getProcessesOfUser(it)
-            dbController.filterLogs(
-                    it,
-                    selectedProcess.value,
-                    selectedLogLevel.value ?: LogLevel.ALL,
-                    searchText.value
-            )
-        }
 
         //Filter process
         combobox<String> {
-            items = processes
-            valueProperty().bindBidirectional(selectedProcess)
+            items = viewModel.processes
+            valueProperty().bindBidirectional(viewModel.selectedProcess)
             promptText = "Select Process"
             cellFormat {
                 text = it
@@ -210,18 +159,9 @@ class MainView : View("Dev Logs") {
             }
             fitToParentWidth()
         }
-        selectedProcess.onChange {
-            dbController.getTagsOfProcess(selectedUser.value, it)
-            dbController.filterLogs(
-                    selectedUser.value,
-                    it,
-                    selectedLogLevel.value ?: LogLevel.ALL,
-                    searchText.value
-            )
-        }
 
         combobox(values = LogLevel.values().toList()) {
-            bindSelected(selectedLogLevel)
+            bindSelected(viewModel.selectedLogLevel)
             promptText = "Select Log Level"
             cellFormat {
                 text = item.name
@@ -243,15 +183,12 @@ class MainView : View("Dev Logs") {
             }
             fitToParentWidth()
         }
-        selectedLogLevel.onChange {
-            dbController.filterLogs(selectedUser.value, selectedProcess.value, it ?: LogLevel.ALL, searchText.value)
-        }
 
         //Search functionality
         combobox<String> {
-            items = tags
+            items = viewModel.tags
             isEditable = true
-            searchText.bind(editor.textProperty())
+            viewModel.searchText.bind(editor.textProperty())
             promptText = "Enter TAG here"
 
             cellFormat {
@@ -264,14 +201,6 @@ class MainView : View("Dev Logs") {
             }
             fitToParentWidth()
         }
-        searchText.onChange {
-            dbController.filterLogs(
-                    selectedUser.value,
-                    selectedProcess.value,
-                    selectedLogLevel.value ?: LogLevel.ALL,
-                    it
-            )
-        }
     }
 
     private fun EventTarget.appStatusView(spacing: Double? = null, alignment: Pos? = null) = hbox {
@@ -282,7 +211,7 @@ class MainView : View("Dev Logs") {
             this.alignment = it
         }
 
-        add(ConnectionStatusView(connectionStatus))
+        add(ConnectionStatusView(viewModel.connectionStatus))
 
         spacer()
 
@@ -295,7 +224,7 @@ class MainView : View("Dev Logs") {
             }
             button("Delete All") {
                 setOnAction {
-                    dbController.deleteAll()
+                    viewModel.deleteAll()
                 }
                 hboxConstraints {
                     marginRight = 8.0
@@ -303,104 +232,11 @@ class MainView : View("Dev Logs") {
             }
             button("Start Server") {
                 setOnAction {
-                    connectionStatus.value = "Connecting"
-                    server.start()
+                    viewModel.startServer()
                     isDisable = true
                 }
             }
         }
-
-        /*fun logColorDef(color: Color, logLevel: LogLevel): StackPane {
-            return stackpane {
-                rectangle {
-                    widthProperty().bind(this@hbox.heightProperty())
-                    heightProperty().bind(this@hbox.heightProperty())
-                    fill = Paint.valueOf(color.toString())
-                }
-                when (logLevel) {
-                    LogLevel.VERBOSE -> text("V")
-                    LogLevel.DEBUG -> text("D") {
-                        fill = Paint.valueOf(Color.WHITE.toString())
-                    }
-                    LogLevel.INFO -> text("I") {
-                        fill = Paint.valueOf(Color.WHITE.toString())
-                    }
-                    LogLevel.WARNING -> text("W")
-                    LogLevel.ERROR -> text("E")
-                }
-            }
-        }
-        add(logColorDef(Color.GRAY, LogLevel.VERBOSE))
-        add(logColorDef(Color.BLACK, LogLevel.DEBUG))
-        add(logColorDef(Color.BLUE, LogLevel.INFO))
-        add(logColorDef(Color.ORANGE.darker(), LogLevel.WARNING))
-        add(logColorDef(Color.RED, LogLevel.ERROR))*/
     }
-
-    //TODO Find ways to move this to its own class.
-    // Currently the main issue with doing this is the [dbController] object.
-    // DbController cannot be injected into a normal class. Is it okay to use constructor initialization?
-    inner class Server {
-        private val socketConnection by lazy {
-            embeddedServer(Netty, port = 8080) {
-                install(WebSockets)
-                Platform.runLater {
-                    connectionStatus.value = "Listening at ${InetAddress.getLocalHost()}"
-                }
-                routing {
-                    val connections = Collections.synchronizedSet<Connection?>(LinkedHashSet())
-                    webSocket("/log/") {
-                        val thisConnection = Connection(this)
-                        connections += thisConnection
-                        try {
-                            send("You are connected! There are ${connections.count()} users here.")
-                            for (frame in incoming) {
-                                frame as? Frame.Text ?: continue
-                                val receivedText = frame.readText()
-                                val messageJson = Gson().fromJson(receivedText, JsonObject::class.java)
-                                val type = messageJson["TYPE"]?.asString
-                                if (type == "DEVICE_INFO") {
-                                    thisConnection.name = messageJson["NAME"].asString
-                                    Platform.runLater {
-                                        selectedUser.value = thisConnection.name
-                                    }
-                                    thisConnection.process = messageJson["PROCESS"].asString
-                                    Platform.runLater {
-                                        selectedProcess.value = thisConnection.process
-                                    }
-                                    dbController.addUser(thisConnection.name)
-                                    dbController.addProcess(thisConnection.process)
-                                    println("Adding user! ${thisConnection.name}")
-                                } else {
-                                    dbController.insertLog(thisConnection.name, thisConnection.process, messageJson)
-                                    println(messageJson)
-                                }
-                            }
-                        } catch (e: Exception) {
-                            println(e.localizedMessage)
-                        } finally {
-                            println("Removing ${thisConnection.name}!")
-                            connections -= thisConnection
-                        }
-                    }
-                }
-            }
-        }
-        private val serverThread by lazy {
-            thread(start = false) {
-                socketConnection.start(wait = true)
-            }
-
-        }
-
-        fun start() {
-            serverThread.start()
-        }
-
-        fun stop() {
-            socketConnection.stop(0, 0)
-            serverThread.interrupt()
-        }
-    }
-
 }
+
