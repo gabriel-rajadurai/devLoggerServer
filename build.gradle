@@ -27,6 +27,8 @@ repositories {
 }
 
 dependencies {
+    implementation fileTree(include: ['*.jar', '*.so'], dir: 'libs')
+
     // Align versions of all Kotlin components
     implementation platform('org.jetbrains.kotlin:kotlin-bom')
 
@@ -35,7 +37,8 @@ dependencies {
 
     // Use the tornadofx
     implementation "no.tornado:tornadofx:1.7.20"
-    implementation "no.tornado:tornadofx-controls:1.0.4"
+//    implementation "no.tornado:tornadofx-controls:1.0.4"
+//    implementation "no.tornado:tornadofx-controlsfx:0.1"
 
     //Ktor
     implementation "io.ktor:ktor-server-netty:1.4.1"

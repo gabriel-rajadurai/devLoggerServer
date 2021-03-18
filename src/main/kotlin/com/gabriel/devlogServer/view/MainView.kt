@@ -2,10 +2,13 @@ package com.gabriel.devlogServer.view
 
 import com.gabriel.devlogServer.Connection
 import com.gabriel.devlogServer.app.LogLevel
+import com.gabriel.devlogServer.app.MyApp
+import com.gabriel.devlogServer.app.SVGIcons
 import com.gabriel.devlogServer.controller.DbController
 import com.gabriel.devlogServer.viewModel.LogViewModel
 import com.google.gson.Gson
 import com.google.gson.JsonObject
+import impl.jfxtras.styles.jmetro.FluentButtonSkin
 import io.ktor.application.*
 import io.ktor.http.cio.websocket.*
 import io.ktor.routing.*
@@ -19,12 +22,10 @@ import javafx.collections.ObservableList
 import javafx.event.EventTarget
 import javafx.geometry.Orientation
 import javafx.geometry.Pos
-import javafx.scene.control.ButtonBar
-import javafx.scene.layout.Priority
-import javafx.scene.layout.StackPane
 import javafx.scene.paint.Color
 import javafx.scene.paint.Paint
 import javafx.stage.StageStyle
+import jfxtras.styles.jmetro.JMetroStyleClass
 import tornadofx.*
 import java.net.InetAddress
 import java.time.Instant
@@ -54,6 +55,8 @@ class MainView : View("Dev Logs") {
 
     override val root = borderpane {
 
+        styleClass.add(JMetroStyleClass.BACKGROUND)
+
         dbController.createTable()
 
         logs = dbController.logs
@@ -69,21 +72,43 @@ class MainView : View("Dev Logs") {
         }
 
         minWidth = 600.0
+        minHeight = 600.0
 
-        top = menubar {
-            //TODO This is not working correctly. Commenting it out for now
-            //useSystemMenuBarProperty().value = true
-            menu("File") {
-                item("Exit").action {
-                    close()
-                }
-                item("About").action {
-                    //Show about dialog
-                    val aboutDialog = dialog(title = "About", stageStyle = StageStyle.UTILITY) {
-                        text = "Dev Log Server - Version 1.0"
-                        stage.resizableProperty().value = false
+        top = hbox {
+            menubar {
+                //TODO This is not working correctly. Commenting it out for now
+                //useSystemMenuBarProperty().value = true
+                menu("File") {
+                    item("Exit").action {
+                        close()
                     }
-                    aboutDialog?.show()
+                    item("About").action {
+                        //Show about dialog
+                        val aboutDialog = dialog(title = "About", stageStyle = StageStyle.UTILITY) {
+                            text = "Dev Log Server - Version 1.0"
+                            stage.resizableProperty().value = false
+                        }
+                        aboutDialog?.show()
+                    }
+                }
+            }
+            spacer()
+
+            button {
+                styleClass.add("menu-bar")
+                fitToParentHeight()
+                graphic = SVGIcons.lightMode
+                setOnAction {
+                    graphic = if ((app as MyApp).isDarkMode) {
+                        SVGIcons.lightMode
+                    } else {
+                        SVGIcons.darkMode
+                    }
+                    try {
+                        (app as MyApp).toggleDarkMode()
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
                 }
             }
         }
@@ -111,16 +136,19 @@ class MainView : View("Dev Logs") {
                     //TODO Bold the Tag, and maybe the time as well ? Use TextFlow
                     text = "$formattedTime - ${item.tag.value} - ${item.message.value}"
 
-                    //Color coding for the various log levels
-                    textFill = when (item.logLevel.value) {
-                        2 -> Paint.valueOf(Color.GRAY.toString())
-                        3 -> Paint.valueOf(Color.BLACK.toString())
-                        4 -> Paint.valueOf(Color.BLUE.toString())
-                        5 -> Paint.valueOf(Color.ORANGE.darker().toString())
-                        6 -> Paint.valueOf(Color.RED.toString())
-                        else -> Paint.valueOf(Color.GRAY.toString())
+                    style {
+                        //Color coding for the various log levels
+                        textFill = when (item.logLevel.value) {
+                            2 -> Paint.valueOf(Color.GRAY.toString())
+                            3 -> Paint.valueOf(Color.BLACK.toString())
+                            4 -> Paint.valueOf(Color.BLUE.toString())
+                            5 -> Paint.valueOf(Color.ORANGE.darker().toString())
+                            6 -> Paint.valueOf(Color.RED.toString())
+                            else -> Paint.valueOf(Color.GRAY.toString())
+                        }
                     }
                 }
+                fitToParentHeight()
             }
         }
 
@@ -158,6 +186,7 @@ class MainView : View("Dev Logs") {
             fitToParentWidth()
         }
         selectedUser.onChange {
+            dbController.getProcessesOfUser(it)
             dbController.filterLogs(
                     it,
                     selectedProcess.value,
@@ -182,6 +211,7 @@ class MainView : View("Dev Logs") {
             fitToParentWidth()
         }
         selectedProcess.onChange {
+            dbController.getTagsOfProcess(selectedUser.value, it)
             dbController.filterLogs(
                     selectedUser.value,
                     it,
@@ -195,13 +225,15 @@ class MainView : View("Dev Logs") {
             promptText = "Select Log Level"
             cellFormat {
                 text = item.name
-                textFill = when (it) {
-                    LogLevel.VERBOSE -> Paint.valueOf(Color.GRAY.toString())
-                    LogLevel.DEBUG -> Paint.valueOf(Color.BLACK.toString())
-                    LogLevel.INFO -> Paint.valueOf(Color.BLUE.toString())
-                    LogLevel.WARNING -> Paint.valueOf(Color.ORANGE.darker().toString())
-                    LogLevel.ERROR -> Paint.valueOf(Color.RED.toString())
-                    LogLevel.ALL -> Paint.valueOf(Color.GRAY.darker().toString())
+                style {
+                    textFill = when (it) {
+                        LogLevel.VERBOSE -> Paint.valueOf(Color.GRAY.toString())
+                        LogLevel.DEBUG -> Paint.valueOf(Color.BLACK.toString())
+                        LogLevel.INFO -> Paint.valueOf(Color.BLUE.toString())
+                        LogLevel.WARNING -> Paint.valueOf(Color.ORANGE.darker().toString())
+                        LogLevel.ERROR -> Paint.valueOf(Color.RED.toString())
+                        LogLevel.ALL -> Paint.valueOf(Color.GRAY.darker().toString())
+                    }
                 }
             }
             hboxConstraints {
@@ -254,7 +286,7 @@ class MainView : View("Dev Logs") {
 
         spacer()
 
-        buttonbar {
+        hbox {
             hboxConstraints {
                 marginTop = 8.0
                 marginBottom = 8.0
@@ -264,6 +296,9 @@ class MainView : View("Dev Logs") {
             button("Delete All") {
                 setOnAction {
                     dbController.deleteAll()
+                }
+                hboxConstraints {
+                    marginRight = 8.0
                 }
             }
             button("Start Server") {
