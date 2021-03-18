@@ -112,32 +112,29 @@ class MainViewModel : ViewModel() {
                 }
                 routing {
                     val connections = Collections.synchronizedSet<Connection?>(LinkedHashSet())
-                    webSocket("/log/") {
+                    webSocket("/log/{deviceName}/{processName}") {
+                        println(call.parameters["deviceName"])
+                        println(call.parameters["processName"])
                         val thisConnection = Connection(this)
                         connections += thisConnection
                         try {
+                            thisConnection.name = call.parameters["deviceName"].toString()
+                            Platform.runLater {
+                                selectedUser.value = thisConnection.name
+                            }
+                            dbController.addUser(thisConnection.name)
+                            thisConnection.process = call.parameters["processName"].toString()
+                            Platform.runLater {
+                                selectedProcess.value = thisConnection.process
+                            }
+                            dbController.addProcess(thisConnection.process)
                             send("You are connected! There are ${connections.count()} users here.")
                             for (frame in incoming) {
                                 frame as? Frame.Text ?: continue
                                 val receivedText = frame.readText()
                                 val messageJson = Gson().fromJson(receivedText, JsonObject::class.java)
-                                val type = messageJson["TYPE"]?.asString
-                                if (type == "DEVICE_INFO") {
-                                    thisConnection.name = messageJson["NAME"].asString
-                                    Platform.runLater {
-                                        selectedUser.value = thisConnection.name
-                                    }
-                                    thisConnection.process = messageJson["PROCESS"].asString
-                                    Platform.runLater {
-                                        selectedProcess.value = thisConnection.process
-                                    }
-                                    dbController.addUser(thisConnection.name)
-                                    dbController.addProcess(thisConnection.process)
-                                    println("Adding user! ${thisConnection.name}")
-                                } else {
-                                    dbController.insertLog(thisConnection.name, thisConnection.process, messageJson)
-                                    println(messageJson)
-                                }
+                                dbController.insertLog(thisConnection.name, thisConnection.process, messageJson)
+                                println(messageJson)
                             }
                         } catch (e: Exception) {
                             println(e.localizedMessage)
