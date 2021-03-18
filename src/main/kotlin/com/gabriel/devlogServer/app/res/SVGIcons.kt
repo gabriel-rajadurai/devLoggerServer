@@ -1,21 +1,7 @@
-package com.gabriel.devlogServer.app
+package com.gabriel.devlogServer.app.res
 
-import impl.jfxtras.styles.jmetro.FluentButtonSkin
-import impl.jfxtras.styles.jmetro.TextFieldSkin
-import javafx.scene.layout.BorderStrokeStyle
 import javafx.scene.paint.Color
-import javafx.scene.text.FontWeight
-import jfxtras.styles.jmetro.JMetro
-import tornadofx.*
-
-class Styles : Stylesheet() {
-
-    init {
-        button {
-            skin = FluentButtonSkin::class
-        }
-    }
-}
+import tornadofx.SVGIcon
 
 object SVGIcons {
 

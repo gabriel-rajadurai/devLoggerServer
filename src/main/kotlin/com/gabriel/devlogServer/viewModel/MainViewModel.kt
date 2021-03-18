@@ -1,7 +1,6 @@
 package com.gabriel.devlogServer.viewModel
 
 import com.gabriel.devlogServer.Connection
-import com.gabriel.devlogServer.app.LogLevel
 import com.gabriel.devlogServer.controller.DbController
 import com.google.gson.Gson
 import com.google.gson.JsonObject
@@ -15,6 +14,7 @@ import javafx.application.Platform
 import javafx.beans.property.SimpleObjectProperty
 import javafx.beans.property.SimpleStringProperty
 import javafx.collections.ObservableList
+import javafx.scene.paint.Color
 import tornadofx.ViewModel
 import tornadofx.onChange
 import tornadofx.singleAssign
@@ -98,7 +98,7 @@ class MainViewModel : ViewModel() {
         server.start()
     }
 
-    fun stopServer(){
+    fun stopServer() {
         server.stop()
     }
 
@@ -163,6 +163,26 @@ class MainViewModel : ViewModel() {
         fun stop() {
             socketConnection.stop(0, 0)
             serverThread.interrupt()
+        }
+    }
+
+    enum class LogLevel(val level: Int) {
+        ALL(1),
+        VERBOSE(2),
+        DEBUG(3),
+        INFO(4),
+        WARNING(5),
+        ERROR(6);
+
+        fun color(isDarkMode: Boolean): Color {
+            return when (this) {
+                ALL -> if (!isDarkMode) Color.GRAY.darker() else Color.LIGHTGRAY
+                VERBOSE -> if (!isDarkMode) Color.GRAY else Color.GRAY.brighter()
+                DEBUG -> if (!isDarkMode) Color.BLACK else Color.WHITE
+                INFO -> if (!isDarkMode) Color.BLUE else Color.LIGHTBLUE
+                WARNING -> if (!isDarkMode) Color.ORANGE.darker() else Color.ORANGE.brighter()
+                ERROR -> if (!isDarkMode) Color.RED else Color.INDIANRED
+            }
         }
     }
 }

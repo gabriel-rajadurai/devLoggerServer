@@ -1,10 +1,10 @@
 package com.gabriel.devlogServer.view
 
-import com.gabriel.devlogServer.app.LogLevel
 import com.gabriel.devlogServer.app.MyApp
-import com.gabriel.devlogServer.app.SVGIcons
+import com.gabriel.devlogServer.app.res.SVGIcons
 import com.gabriel.devlogServer.viewModel.LogViewModel
 import com.gabriel.devlogServer.viewModel.MainViewModel
+import com.gabriel.devlogServer.viewModel.MainViewModel.LogLevel
 import javafx.event.EventTarget
 import javafx.geometry.Orientation
 import javafx.geometry.Pos
@@ -21,7 +21,7 @@ import java.time.format.DateTimeFormatter
 
 class MainView : View("Dev Logs") {
 
-    private val viewModel : MainViewModel by inject()
+    private val viewModel: MainViewModel by inject()
 
     override val root = borderpane {
 
@@ -57,7 +57,7 @@ class MainView : View("Dev Logs") {
                 fitToParentHeight()
                 graphic = SVGIcons.lightMode
                 setOnAction {
-                    graphic = if ((app as MyApp).isDarkMode) {
+                    graphic = if ((app as MyApp).isDarkMode.value) {
                         SVGIcons.lightMode
                     } else {
                         SVGIcons.darkMode
@@ -80,7 +80,7 @@ class MainView : View("Dev Logs") {
 
             listview<LogViewModel> {
                 items = viewModel.logs
-                cellFormat {
+                cellFormat { logViewModel ->
                     //For wrapping text
                     minWidth = width
                     maxWidth = width
@@ -94,15 +94,24 @@ class MainView : View("Dev Logs") {
                     //TODO Bold the Tag, and maybe the time as well ? Use TextFlow
                     text = "$formattedTime - ${item.tag.value} - ${item.message.value}"
 
+                    val logLevel = when (logViewModel.logLevel.value) {
+                        1 -> LogLevel.ALL
+                        2 -> LogLevel.VERBOSE
+                        3 -> LogLevel.DEBUG
+                        4 -> LogLevel.INFO
+                        5 -> LogLevel.WARNING
+                        6 -> LogLevel.ERROR
+                        else -> LogLevel.ALL
+                    }
                     style {
                         //Color coding for the various log levels
-                        textFill = when (item.logLevel.value) {
-                            2 -> Paint.valueOf(Color.GRAY.toString())
-                            3 -> Paint.valueOf(Color.BLACK.toString())
-                            4 -> Paint.valueOf(Color.BLUE.toString())
-                            5 -> Paint.valueOf(Color.ORANGE.darker().toString())
-                            6 -> Paint.valueOf(Color.RED.toString())
-                            else -> Paint.valueOf(Color.GRAY.toString())
+                        textFill = Paint.valueOf(logLevel.color((app as MyApp).isDarkMode.value).toString())
+                    }
+
+                    //TODO Is this okay?
+                    (app as MyApp).isDarkMode.onChange {
+                        style {
+                            textFill = Paint.valueOf(logLevel.color(it).toString())
                         }
                     }
                 }
@@ -163,16 +172,14 @@ class MainView : View("Dev Logs") {
         combobox(values = LogLevel.values().toList()) {
             bindSelected(viewModel.selectedLogLevel)
             promptText = "Select Log Level"
-            cellFormat {
+            cellFormat { logLevel ->
                 text = item.name
                 style {
-                    textFill = when (it) {
-                        LogLevel.VERBOSE -> Paint.valueOf(Color.GRAY.toString())
-                        LogLevel.DEBUG -> Paint.valueOf(Color.BLACK.toString())
-                        LogLevel.INFO -> Paint.valueOf(Color.BLUE.toString())
-                        LogLevel.WARNING -> Paint.valueOf(Color.ORANGE.darker().toString())
-                        LogLevel.ERROR -> Paint.valueOf(Color.RED.toString())
-                        LogLevel.ALL -> Paint.valueOf(Color.GRAY.darker().toString())
+                    textFill = Paint.valueOf(logLevel.color((app as MyApp).isDarkMode.value).toString())
+                }
+                (app as MyApp).isDarkMode.onChange {
+                    style {
+                        textFill = Paint.valueOf(logLevel.color(it).toString())
                     }
                 }
             }
