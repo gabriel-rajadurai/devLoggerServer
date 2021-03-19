@@ -8,7 +8,6 @@ import com.gabriel.devlogServer.viewModel.MainViewModel.LogLevel
 import javafx.event.EventTarget
 import javafx.geometry.Orientation
 import javafx.geometry.Pos
-import javafx.scene.paint.Color
 import javafx.scene.paint.Paint
 import javafx.stage.StageStyle
 import jfxtras.styles.jmetro.JMetroStyleClass
@@ -38,6 +37,7 @@ class MainView : View("Dev Logs") {
                 //useSystemMenuBarProperty().value = true
                 menu("File") {
                     item("Exit").action {
+                        viewModel.stopServer()
                         close()
                     }
                     item("About").action {
