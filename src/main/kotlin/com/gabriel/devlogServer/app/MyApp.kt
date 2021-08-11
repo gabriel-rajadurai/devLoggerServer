@@ -8,6 +8,7 @@ import javafx.stage.Stage
 import jfxtras.styles.jmetro.JMetro
 import jfxtras.styles.jmetro.Style
 import tornadofx.App
+import tornadofx.launch
 
 class MyApp : App(MainView::class, Styles::class) {
     val jMetro = JMetro(Style.LIGHT)
@@ -26,5 +27,9 @@ class MyApp : App(MainView::class, Styles::class) {
         }
         isDarkMode.value = !isDarkMode.value
     }
+}
+
+fun main(args: Array<String>) {
+    launch<MyApp>(args)
 }
 
