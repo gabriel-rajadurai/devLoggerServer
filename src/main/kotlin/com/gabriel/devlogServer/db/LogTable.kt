@@ -9,7 +9,7 @@ object LogTable : IntIdTable() {
     val userId = varchar("userId", 50)
     val processName = varchar("processName", 50)
     val logLevel = integer("logLevel")
-    val tag = varchar("tag", 20)
+    val tag = varchar("tag", 23)
     val timeInMillis = long("timeInMillis")
     val message = varchar("message", 256)
 }
